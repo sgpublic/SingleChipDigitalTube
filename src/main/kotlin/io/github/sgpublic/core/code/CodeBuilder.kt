@@ -1,6 +1,5 @@
 package io.github.sgpublic.core.code
 
-import androidx.compose.ui.text.toUpperCase
 import java.util.*
 
 abstract class CodeBuilder {

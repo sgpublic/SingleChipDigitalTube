@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "io.github.sgpublic"
-version = "1.0"
+version = "1.0.1"
 
 repositories {
     google()
@@ -38,7 +38,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "SingleChipDigitalTube"
-            packageVersion = "1.0.0"
+            packageVersion = "1.0.1"
         }
     }
 }

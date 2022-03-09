@@ -2,7 +2,6 @@ package io.github.sgpublic.compose
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathOperation
 
 /**
  * 在已有 path 路径上新建 path，并在其基础上偏移
