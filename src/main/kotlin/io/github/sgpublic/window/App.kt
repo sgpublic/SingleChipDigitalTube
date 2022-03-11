@@ -1,12 +1,16 @@
 package io.github.sgpublic.window
 
 import androidx.compose.desktop.ui.tooling.preview.Preview
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,11 +20,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
 import io.github.sgpublic.compose.DropDownList
 import io.github.sgpublic.compose.Path
 import io.github.sgpublic.compose.openInBrowser
 import io.github.sgpublic.core.ClipboardUtil
 import io.github.sgpublic.core.code.*
+import kotlinx.coroutines.runBlocking
 
 /**
  * 主界面
@@ -64,14 +71,6 @@ class App {
     }
 
     /**
-     * 根据共阴/共阳标题设置状态，并刷新代码框
-     */
-    private fun setCommon(str: String) {
-        common.value = str == commonList[0]
-        buildCode()
-    }
-
-    /**
      * 代码构建格式
      */
     private val singleChipList = mapOf(
@@ -93,14 +92,6 @@ class App {
     private val singleChipOpen = mutableStateOf(false)
 
     /**
-     * 设置代码构建格式
-     */
-    private fun setSingleChip(str: String) {
-        singleChip.value = str
-        buildCode()
-    }
-
-    /**
      * 非数字字符支持
      */
     private val dataList = listOf(
@@ -112,12 +103,14 @@ class App {
     /**
      * 代码框文本
      */
-    private val out = mutableStateOf("")
+    private var out = ""
 
     /**
      * 添加到编译列表的字符
      */
-    private val outList = mutableStateListOf<Char>()
+    private val outList = mutableStateListOf<Char>().also {
+        for (i in '0' .. '9') it.add(i)
+    }
 
     /**
      * 交换编译列表中字符的位置
@@ -128,7 +121,6 @@ class App {
         val tmp = outList[from]
         outList[from] = outList[to]
         outList[to] = tmp
-        buildCode()
     }
 
     /**
@@ -159,7 +151,6 @@ class App {
     private fun addToList(char: Char) {
         outList.add(char)
         light(char)
-        buildCode()
     }
 
     /**
@@ -177,20 +168,28 @@ class App {
     /**
      * 输出编译代码
      */
-    private fun buildCode() {
+    private fun buildCode(): String {
         val out = StringBuilder()
-        val builder = singleChipList[singleChip.value] ?: return
+        val builder = singleChipList[singleChip.value] ?: return ""
         for (i in outList) {
             out.append(builder.postBuild(i, common.value, segment))
         }
-        this.out.value = out.toString()
+        this.out = out.toString()
+        return this.out
     }
 
     /**
      * 获取单独一段的亮灭状态
      */
-    private fun getColor(char: Char): Color {
+    private fun getLightColor(char: Char): Color {
         return if (lighting[char - 'a']) Color.Red else Color.White
+    }
+
+    /**
+     * 获取单独一段标识高亮状态
+     */
+    private fun getIndicateColor(char: Char): Color {
+        return if (lighting[char - 'a']) Color.White else Color.Gray
     }
 
     /**
@@ -213,7 +212,6 @@ class App {
         val tmp = segment[char] ?: return
         segment[char] = int
         segment[key] = tmp
-        buildCode()
     }
 
     companion object {
@@ -249,17 +247,18 @@ class App {
         @OptIn(ExperimentalMaterialApi::class)
         @Composable
         @Preview
-        @Suppress("LocalVariableName", "FunctionName")
+        @Suppress("LocalVariableName", "FunctionName", "EXPERIMENTAL_IS_NOT_ENABLED")
         fun Compose() {
             val ViewModel by remember { mutableStateOf(App()) }
-            MaterialTheme {
+            Box {
                 Row(
                     modifier = Modifier.padding(30.dp, 15.dp)
-                        .fillMaxSize()
+                        .fillMaxSize(),
+                    horizontalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
                     Column {
                         Row(
-                            modifier = Modifier.height(328.dp)
+                            modifier = Modifier.weight(1f)
                         ) {
                             // 数码管
                             Card(
@@ -269,62 +268,104 @@ class App {
                                 elevation = 4.dp,
                                 shape = RoundedCornerShape(8.dp)
                             ) {
-                                Canvas(
-                                    modifier = Modifier.fillMaxSize()
-                                        .padding(0.dp, 20.dp)
-                                ) {
-                                    // a
-                                    drawPath(
-                                        path = Path(horizontal, Offset(74.dp.value, 10.dp.value)),
-                                        color = ViewModel.getColor('a'),
+                                Box {
+                                    Canvas(
+                                        modifier = Modifier.fillMaxSize()
+                                            .padding(0.dp, 20.dp)
+                                    ) {
+                                        // a
+                                        drawPath(
+                                            path = Path(horizontal, Offset(74.dp.value, 10.dp.value)),
+                                            color = ViewModel.getLightColor('a'),
+                                        )
+                                        // c
+                                        drawPath(
+                                            path = Path(vertical, Offset(172.dp.value, 26.dp.value)),
+                                            color = ViewModel.getLightColor('b'),
+                                        )
+                                        // b
+                                        drawPath(
+                                            path = Path(vertical, Offset(151.dp.value, 142.dp.value)),
+                                            color = ViewModel.getLightColor('c'),
+                                        )
+                                        // d
+                                        drawPath(
+                                            path = Path(horizontal, Offset(33.dp.value, 245.dp.value)),
+                                            color = ViewModel.getLightColor('d'),
+                                        )
+                                        // e
+                                        drawPath(
+                                            path = Path(vertical, Offset(19.dp.value, 142.dp.value)),
+                                            color = ViewModel.getLightColor('e'),
+                                        )
+                                        // f
+                                        drawPath(
+                                            path = Path(vertical, Offset(40.dp.value, 26.dp.value)),
+                                            color = ViewModel.getLightColor('f'),
+                                        )
+                                        // g
+                                        drawPath(
+                                            path = Path(horizontal, Offset(54.dp.value, 127.dp.value)),
+                                            color = ViewModel.getLightColor('g'),
+                                        )
+                                        // dp
+                                        drawCircle(
+                                            radius = 12.dp.value,
+                                            center = Offset(200.dp.value, 260.dp.value),
+                                            color = ViewModel.getLightColor('h'),
+                                        )
+                                    }
+                                    Text(
+                                        text = "a",
+                                        color = ViewModel.getIndicateColor('a'),
+                                        modifier = Modifier.offset(132.dp, 34.dp),
                                     )
-                                    // c
-                                    drawPath(
-                                        path = Path(vertical, Offset(172.dp.value, 26.dp.value)),
-                                        color = ViewModel.getColor('b'),
+                                    Text(
+                                        text = "b",
+                                        color = ViewModel.getIndicateColor('b'),
+                                        modifier = Modifier.offset(190.dp, 95.dp),
                                     )
-                                    // b
-                                    drawPath(
-                                        path = Path(vertical, Offset(151.dp.value, 142.dp.value)),
-                                        color = ViewModel.getColor('c'),
+                                    Text(
+                                        text = "c",
+                                        color = ViewModel.getIndicateColor('c'),
+                                        modifier = Modifier.offset(169.dp, 210.dp),
                                     )
-                                    // d
-                                    drawPath(
-                                        path = Path(horizontal, Offset(33.dp.value, 245.dp.value)),
-                                        color = ViewModel.getColor('d'),
+                                    Text(
+                                        text = "d",
+                                        color = ViewModel.getIndicateColor('d'),
+                                        modifier = Modifier.offset(94.dp, 270.dp),
                                     )
-                                    // e
-                                    drawPath(
-                                        path = Path(vertical, Offset(19.dp.value, 142.dp.value)),
-                                        color = ViewModel.getColor('e'),
+                                    Text(
+                                        text = "e",
+                                        color = ViewModel.getIndicateColor('e'),
+                                        modifier = Modifier.offset(37.dp, 210.dp),
                                     )
-                                    // f
-                                    drawPath(
-                                        path = Path(vertical, Offset(40.dp.value, 26.dp.value)),
-                                        color = ViewModel.getColor('f'),
+                                    Text(
+                                        text = "f",
+                                        color = ViewModel.getIndicateColor('f'),
+                                        modifier = Modifier.offset(59.dp, 95.dp),
                                     )
-                                    // g
-                                    drawPath(
-                                        path = Path(horizontal, Offset(54.dp.value, 127.dp.value)),
-                                        color = ViewModel.getColor('g'),
+                                    Text(
+                                        text = "g",
+                                        color = ViewModel.getIndicateColor('g'),
+                                        modifier = Modifier.offset(113.dp, 150.dp),
                                     )
-                                    // dp
-                                    drawCircle(
-                                        radius = 12.dp.value,
-                                        center = Offset(200.dp.value, 260.dp.value),
-                                        color = ViewModel.getColor('h'),
+                                    Text(
+                                        text = "h",
+                                        color = ViewModel.getIndicateColor('h'),
+                                        modifier = Modifier.offset(196.dp, 270.dp),
                                     )
                                 }
                             }
                             Column(
                                 modifier = Modifier.padding(start = 30.dp)
                                     .wrapContentWidth()
-                                    .fillMaxHeight()
+                                    .fillMaxHeight(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Text(
                                     text = "对应关系",
-                                    color = Color.Blue,
-                                    modifier = Modifier.padding(0.dp, 10.dp)
+                                    color = Color.Blue
                                 )
                                 // 对应关系设置
                                 for (i in 'a' .. 'h') {
@@ -332,7 +373,8 @@ class App {
                                         title = i.toString(),
                                         selected = ViewModel.segment[i]!!,
                                         request = { ViewModel.dropdown[i] = it },
-                                        expanded = ViewModel.dropdown[i] == true
+                                        expanded = ViewModel.dropdown[i] == true,
+                                        modifier = Modifier.width(24.dp)
                                     ) {
                                         ViewModel.setSegment(i, it)
                                     }
@@ -340,7 +382,8 @@ class App {
                             }
                         }
                         Row(
-                            modifier = Modifier.padding(top = 26.dp, bottom = 5.dp)
+                            modifier = Modifier.padding(top = 30.dp, bottom = 10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             // 设置共阴/共阳
                             DropDownList(
@@ -349,8 +392,9 @@ class App {
                                 expanded = ViewModel.commonOpen.value,
                                 request = { ViewModel.commonOpen.value = it },
                                 list = ViewModel.commonList,
+                                modifier = Modifier.width(100.dp)
                             ) {
-                                ViewModel.setCommon(it)
+                                ViewModel.common.value = it == ViewModel.commonList[0]
                             }
                             // 设置输出类型
                             DropDownList(
@@ -359,165 +403,148 @@ class App {
                                 expanded = ViewModel.singleChipOpen.value,
                                 request = { ViewModel.singleChipOpen.value = it },
                                 list = ViewModel.singleChipList.keys.toList(),
-                                modifier = Modifier.padding(start = 10.dp)
+                                modifier = Modifier.width(100.dp)
                             ) {
-                                ViewModel.setSingleChip(it)
+                                ViewModel.singleChip.value = it
                             }
                         }
                     }
                     Column {
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.weight(1f)
                         ) {
                             Card(
                                 elevation = 4.dp,
                                 shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.size(180.dp, 340.dp)
+                                modifier = Modifier.width(190.dp)
+                                    .fillMaxHeight()
                             ) {
-                                // 编译列表
-                                LazyColumn {
-                                    for (i in 0 until ViewModel.outList.size) {
-                                        item {
-                                            Row(
-                                                modifier = Modifier.clickable {
-                                                    ViewModel.light(ViewModel.outList[i])
-                                                }.fillParentMaxWidth()
-                                                    .padding(horizontal = 20.dp)
-                                                    .height(44.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(5.dp)
-                                            ) {
-                                                val char = ViewModel.outList[i]
-                                                Text(
-                                                    text = if (char == ' ') "空" else char.toString(),
-                                                    modifier = Modifier.weight(1f, true)
-                                                )
-                                                Image(
-                                                    painter = painterResource("ic_up.png"),
-                                                    contentDescription = "上移",
-                                                    alpha = if (i > 0) 1f else 0.3f,
-                                                    modifier = Modifier.size(22.dp).let {
-                                                        if (i > 0) {
-                                                            return@let it.clickable {
-                                                                ViewModel.moveUp(i)
-                                                            }
-                                                        } else return@let it
-                                                    }
-                                                )
-                                                Image(
-                                                    painter = painterResource("ic_down.png"),
-                                                    contentDescription = "下移",
-                                                    alpha = if (i < ViewModel.outList.size - 1)
-                                                        1f else 0.3f,
-                                                    modifier = Modifier.size(22.dp).let {
-                                                        if (i < ViewModel.outList.size - 1) {
-                                                            return@let it.clickable {
-                                                                ViewModel.moveDown(i)
-                                                            }
-                                                        } else return@let it
-                                                    }
-                                                )
-                                                Image(
-                                                    painter = painterResource("ic_delete.png"),
-                                                    contentDescription = "删除",
-                                                    modifier = Modifier.size(22.dp).clickable {
-                                                        ViewModel.outList.removeAt(i)
-                                                    }
-                                                )
+                                Box {
+                                    val scrollState = rememberLazyListState()
+                                    // 编译列表
+                                    // LazyColumn 手势：https://github.com/JetBrains/compose-jb/issues/1555
+                                    LazyColumn(
+                                        state = scrollState,
+                                        modifier = Modifier.draggable(rememberDraggableState {
+                                            runBlocking {
+                                                scrollState.scrollBy(-it)
+                                            }
+                                        }, orientation = Orientation.Vertical)
+                                    ) {
+                                        for (i in 0 until ViewModel.outList.size) {
+                                            item {
+                                                Row(
+                                                    modifier = Modifier.clickable {
+                                                        ViewModel.light(ViewModel.outList[i])
+                                                    }.fillParentMaxWidth()
+                                                        .padding(horizontal = 20.dp)
+                                                        .height(44.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                                ) {
+                                                    val char = ViewModel.outList[i]
+                                                    Text(
+                                                        text = if (char == ' ') "空" else char.toString(),
+                                                        modifier = Modifier.weight(1f, true)
+                                                    )
+                                                    Image(
+                                                        painter = painterResource("ic_up.png"),
+                                                        contentDescription = "上移",
+                                                        alpha = if (i > 0) 1f else 0.3f,
+                                                        modifier = Modifier.size(22.dp).let {
+                                                            if (i > 0) {
+                                                                return@let it.clickable {
+                                                                    ViewModel.moveUp(i)
+                                                                }
+                                                            } else return@let it
+                                                        }
+                                                    )
+                                                    Image(
+                                                        painter = painterResource("ic_down.png"),
+                                                        contentDescription = "下移",
+                                                        alpha = if (i < ViewModel.outList.size - 1)
+                                                            1f else 0.3f,
+                                                        modifier = Modifier.size(22.dp).let {
+                                                            if (i < ViewModel.outList.size - 1) {
+                                                                return@let it.clickable {
+                                                                    ViewModel.moveDown(i)
+                                                                }
+                                                            } else return@let it
+                                                        }
+                                                    )
+                                                    Image(
+                                                        painter = painterResource("ic_delete.png"),
+                                                        contentDescription = "删除",
+                                                        modifier = Modifier.size(22.dp).clickable {
+                                                            ViewModel.outList.removeAt(i)
+                                                        }
+                                                    )
+                                                }
                                             }
                                         }
                                     }
+                                    VerticalScrollbar(
+                                        modifier = Modifier.align(Alignment.CenterEnd)
+                                            .fillMaxHeight(),
+                                        adapter = rememberScrollbarAdapter(scrollState)
+                                    )
                                 }
                             }
-                            // 输出代码
-                            OutlinedTextField(
-                                value = ViewModel.out.value,
-                                onValueChange = { },
-                                readOnly = true,
-                                modifier = Modifier.height(340.dp)
-                            )
+                            Card(
+                                elevation = 4.dp,
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxHeight()
+                                    .weight(1f)
+                            ) {
+                                SelectionContainer {
+                                    Box {
+                                        val scrollState = rememberScrollState()
+                                        Column(
+                                            modifier = Modifier.verticalScroll(scrollState)
+                                        ) {
+                                            // 输出代码
+                                            Text(
+                                                text = ViewModel.buildCode(),
+                                                modifier = Modifier.padding(vertical = 10.dp)
+                                                    .fillMaxSize()
+                                            )
+                                        }
+                                        VerticalScrollbar(
+                                            modifier = Modifier.align(Alignment.CenterEnd)
+                                                .fillMaxHeight(),
+                                            adapter = rememberScrollbarAdapter(scrollState)
+                                        )
+                                    }
+                                }
+                            }
                         }
                         Row(
-                            modifier = Modifier.padding(vertical = 14.dp),
+                            modifier = Modifier.padding(top = 14.dp)
+                                .fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             // 清空编译列表
                             Button(
                                 onClick = { ViewModel.outList.clear() },
                                 shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.width(90.dp)
+                                modifier = Modifier.weight(1f)
                             ) {
                                 Text("清空")
                             }
-                            Column {
-                                // 添加字符到编译列表
-                                Button(
-                                    onClick = { ViewModel.addPanel.value = true },
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.width(90.dp)
-                                ) {
-                                    Text("添加")
-                                }
-                                DropdownMenu(
-                                    expanded = ViewModel.addPanel.value,
-                                    onDismissRequest = { ViewModel.addPanel.value = false }
-                                ) {
-                                    // 一键添加所有数字
-                                    DropdownMenuItem(
-                                        onClick = {
-                                            ViewModel.addPanel.value = false
-                                            for (i in 0 .. 9) ViewModel.addToList('0' + i)
-                                        }
-                                    ) {
-                                        Text("数字")
-                                    }
-                                    // 单独添加数字
-                                    for (i in '0' .. '9') {
-                                        DropdownMenuItem(
-                                            onClick = {
-                                                ViewModel.addPanel.value = false
-                                                ViewModel.addToList(i)
-                                            }
-                                        ) {
-                                            Text(i.toString())
-                                        }
-                                    }
-                                    // 一键添加所有非数字字符
-                                    DropdownMenuItem(
-                                        onClick = {
-                                            ViewModel.addPanel.value = false
-                                            for (i in ViewModel.dataList) ViewModel.addToList(i)
-                                        }
-                                    ) {
-                                        Text("字母")
-                                    }
-                                    // 单独添加非数字字符
-                                    for (i in ViewModel.dataList) {
-                                        DropdownMenuItem(
-                                            onClick = {
-                                                ViewModel.addPanel.value = false
-                                                ViewModel.addToList(i)
-                                            }
-                                        ) {
-                                            Text(i.toString())
-                                        }
-                                    }
-                                    // 添加空字符
-                                    DropdownMenuItem(
-                                        onClick = {
-                                            ViewModel.addPanel.value = false
-                                            ViewModel.addToList(' ')
-                                        }
-                                    ) {
-                                        Text("空")
-                                    }
-                                }
+                            // 添加字符到编译列表
+                            Button(
+                                onClick = { ViewModel.addPanel.value = true },
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("添加")
                             }
                             // 复制代码
                             Button(
-                                onClick = { ClipboardUtil.set(ViewModel.out.value) },
+                                onClick = { ClipboardUtil.set(ViewModel.out) },
                                 shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.width(90.dp)
+                                modifier = Modifier.weight(1f)
                             ) {
                                 Text("复制")
                             }
@@ -525,9 +552,124 @@ class App {
                             Button(
                                 onClick = { openInBrowser("https://github.com/sgpublic/SingleChipDigitalTube_JetpackCompose") },
                                 shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.width(90.dp)
+                                modifier = Modifier.weight(1f)
                             ) {
                                 Text("关于")
+                            }
+                        }
+                    }
+                }
+                if (ViewModel.addPanel.value) {
+                    // 添加面板
+                    Popup(
+                        alignment = Alignment.Center,
+                        focusable = true,
+                        onDismissRequest = { ViewModel.addPanel.value = false },
+                    ) {
+                        Card(
+                            elevation = 4.dp,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.size(180.dp, 400.dp)
+                                .background(Color.White)
+                        ) {
+                            Column {
+                                Text(
+                                    text = "添加到列表",
+                                    modifier = Modifier.padding(
+                                        start = 20.dp, end = 20.dp,
+                                        top = 10.dp
+                                    ),
+                                    fontSize = 16.sp,
+                                    color = Color.Gray
+                                )
+                                Text(
+                                    text = "（点击空白处关闭）",
+                                    modifier = Modifier.padding(
+                                        start = 20.dp, end = 20.dp,
+                                        bottom = 10.dp
+                                    ),
+                                    fontSize = 12.sp,
+                                    color = Color.Gray
+                                )
+                                Box {
+                                    val scrollState = rememberLazyListState()
+                                    LazyColumn(
+                                        state = scrollState,
+                                        modifier = Modifier.draggable(
+                                            state = rememberDraggableState {
+                                                runBlocking {
+                                                    scrollState.scrollBy(-it)
+                                                }
+                                            },
+                                            orientation = Orientation.Vertical
+                                        )
+                                    ) {
+                                        // 一键添加所有数字
+                                        item {
+                                            DropdownMenuItem(
+                                                onClick = {
+                                                    ViewModel.addPanel.value = false
+                                                    for (i in 0 .. 9) ViewModel.addToList('0' + i)
+                                                }
+                                            ) {
+                                                Text("数字")
+                                            }
+                                        }
+                                        // 单独添加数字
+                                        for (i in '0' .. '9') {
+                                            item {
+                                                DropdownMenuItem(
+                                                    onClick = {
+                                                        ViewModel.addPanel.value = false
+                                                        ViewModel.addToList(i)
+                                                    }
+                                                ) {
+                                                    Text(i.toString())
+                                                }
+                                            }
+                                        }
+                                        // 一键添加所有非数字字符
+                                        item {
+                                            DropdownMenuItem(
+                                                onClick = {
+                                                    ViewModel.addPanel.value = false
+                                                    for (i in ViewModel.dataList) ViewModel.addToList(i)
+                                                }
+                                            ) {
+                                                Text("字母")
+                                            }
+                                        }
+                                        // 单独添加非数字字符
+                                        for (i in ViewModel.dataList) {
+                                            item {
+                                                DropdownMenuItem(
+                                                    onClick = {
+                                                        ViewModel.addPanel.value = false
+                                                        ViewModel.addToList(i)
+                                                    }
+                                                ) {
+                                                    Text(i.toString())
+                                                }
+                                            }
+                                        }
+                                        // 添加空字符
+                                        item {
+                                            DropdownMenuItem(
+                                                onClick = {
+                                                    ViewModel.addPanel.value = false
+                                                    ViewModel.addToList(' ')
+                                                }
+                                            ) {
+                                                Text("空")
+                                            }
+                                        }
+                                    }
+                                    VerticalScrollbar(
+                                        adapter = rememberScrollbarAdapter(scrollState),
+                                        modifier = Modifier.align(Alignment.CenterEnd)
+                                            .fillMaxHeight()
+                                    )
+                                }
                             }
                         }
                     }

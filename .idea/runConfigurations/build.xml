@@ -1,0 +1,7 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="build" type="CompoundRunConfigurationType">
+    <toRun name="createDistributable" type="GradleRunConfiguration" />
+    <toRun name="package" type="GradleRunConfiguration" />
+    <method v="2" />
+  </configuration>
+</component>

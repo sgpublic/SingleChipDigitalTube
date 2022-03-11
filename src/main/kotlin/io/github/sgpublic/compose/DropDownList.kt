@@ -26,61 +26,23 @@ import androidx.compose.ui.unit.dp
 fun DropDownList(
     title: String,
     selected: Int,
+    size: Int = 8,
     expanded: Boolean = false,
     request: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
     onSelect: (Int) -> Unit = { }
 ) {
-    Row(
-        modifier = Modifier.wrapContentHeight()
-            .width(120.dp).padding(0.dp, 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = title,
-            modifier = Modifier.width(24.dp)
-        )
-        Box(
-            modifier = Modifier.wrapContentSize()
-        ) {
-            Column {
-                Card(
-                    elevation = 4.dp,
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.size(80.dp, 28.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(14.dp, 0.dp)
-                    ) {
-                        Text(
-                            text = "$selected",
-                            modifier = Modifier.align(Alignment.CenterVertically)
-                        )
-                    }
-                }
-                DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { request(false) },
-                    modifier = Modifier.width(140.dp)
-                ) {
-                    for (i in 0 until 8) {
-                        DropdownMenuItem(
-                            onClick = {
-                                request(false)
-                                onSelect(i)
-                            }
-                        ) {
-                            Text("$i")
-                        }
-                    }
-                }
-            }
-            Spacer(
-                modifier = Modifier.matchParentSize()
-                    .background(Color.Transparent)
-                    .clickable { request(true) }
-            )
-        }
-    }
+    DropDownList(
+        title = title,
+        selected = selected.toString(),
+        expanded = expanded,
+        request = request,
+        modifier = modifier,
+        list = mutableListOf<String>().also {
+            for (i in 0 until size) it.add(i.toString())
+        },
+        onSelect = { onSelect(it.toInt()) }
+    )
 }
 
 /**
@@ -104,13 +66,11 @@ fun DropDownList(
     onSelect: (String) -> Unit = { }
 ) {
     Row(
-        modifier = modifier.wrapContentSize()
-            .padding(0.dp, 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = title,
-            modifier = Modifier.width(100.dp)
+            modifier = modifier
         )
         Box(
             modifier = Modifier.wrapContentSize()
@@ -132,14 +92,15 @@ fun DropDownList(
                 }
                 DropdownMenu(
                     expanded = expanded,
-                    onDismissRequest = { request(false) }
+                    onDismissRequest = { request(false) },
                 ) {
                     for (i in list) {
                         DropdownMenuItem(
                             onClick = {
                                 request(false)
                                 onSelect(i)
-                            }
+                            },
+                            modifier = Modifier.height(40.dp)
                         ) {
                             Text(i)
                         }

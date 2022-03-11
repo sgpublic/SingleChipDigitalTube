@@ -1,4 +1,7 @@
 // Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+package io.github.sgpublic
+
+import androidx.compose.material.MaterialTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -15,7 +18,7 @@ fun main() {
     application {
         Window(
             onCloseRequest = ::exitApplication,
-            title = "KED 数码管生成器 by 忆丶距",
+            title = "LED 数码管生成器 by 忆丶距 V1.1.0",
             resizable = false,
             state = rememberWindowState(
                 size = DpSize(860.dp, 470.dp),
@@ -23,7 +26,9 @@ fun main() {
                 position = WindowPosition.Aligned(Alignment.Center)
             )
         ) {
-            App.Compose()
+            MaterialTheme {
+                App.Compose()
+            }
         }
     }
 }

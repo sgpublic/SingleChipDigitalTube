@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "io.github.sgpublic"
-version = "1.0.1"
+version = "1.1.0"
 
 repositories {
     google()
@@ -34,11 +34,11 @@ tasks.withType<KotlinCompile> {
 
 compose.desktop {
     application {
-        mainClass = "MainKt"
+        mainClass = "io.github.sgpublic.MainKt"
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "SingleChipDigitalTube"
-            packageVersion = "1.0.1"
+            packageVersion = "1.1.0"
         }
     }
 }
